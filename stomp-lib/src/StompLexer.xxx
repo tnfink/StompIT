@@ -1,0 +1,66 @@
+{
+module StompLexer where
+
+import Data.Either
+}
+
+%wrapper "monad"
+
+$headerItem  = [^:]
+$body        = [^\0]
+$nl          = [\n]
+
+tokens :-
+<0> SEND                             { token (\s l -> Send) }
+<0> SUBSCRIBE                        { token (\s l -> Subscribe) }
+<0> UNSUBSCRIBE                      { token (\s l -> Unsubscribe) }
+<0> BEGIN                            { token (\s l -> Begin) }
+<0> COMMIT                           { token (\s l -> Commit) }
+<0> ABORT                            { token (\s l -> Abort) }
+<0> ACK                              { token (\s l -> Ack) }
+<0> NACK                             { token (\s l -> Nack) }
+<0> DISCONNECT                       { token (\s l -> Disconnect) }
+<0> CONNECT                          { token (\s l -> Connect) }
+<0> STOMP                            { token (\s l -> Stomp) }
+<0> CONNECTED                        { token (\s l -> Connected) }
+<0> MESSAGE                          { token (\s l -> Message) }
+<0> RECEIPT                          { token (\s l -> Receipt) }
+<0> ERROR                            { token (\s l -> Error) }
+-- <0> $nl                               { `andBegin` headerStart }
+-- <headerStart> $nl                     { begin body }
+-- <headerStart> $headerItem+           { \s l -> HeaderName s }
+-- <headerStart> :                      {}
+-- <headerStart> $headerItem+$nl        { \s l -> HeaderValue s }
+-- <body>  $body*\0                     { \s l -> Body s}
+
+{
+-- Each right-hand side has type :: String -> Token
+
+-- The token type:
+data Token =
+      Send        
+    | Subscribe
+    | Unsubscribe
+    | Begin
+    | Commit
+    | Abort
+    | Ack
+    | Nack
+    | Disconnect
+    | Connect
+    | Stomp
+    | Connected
+    | Message
+    | Receipt
+    | Error
+    | HeaderName String
+    | HeaderValue String
+    | Body String
+    | EndOfMessage
+    deriving (Eq,Show)
+
+alexEOF :: Alex Token   
+alexEOF =  return EndOfMessage  
+   
+    
+ }
