@@ -7,7 +7,7 @@
 -- Aktueller Testlauf
 --   handle <- stompConnectToServer "127.0.0.1" "61613"
 --   stompConnectToMessaging handle "localhost" "guest" "guest"
---   stompReceiveMessage handle
+--   stompReceiveFrame handle
 
 
 module Stomp where
@@ -17,6 +17,7 @@ import Network.Socket
 -- import Network.BSD
 import Data.Either
 import Data.List
+import Data.Maybe
 import System.IO
 import Test.HUnit
 
@@ -48,6 +49,7 @@ data StompHandle =
 data StompFrame = 
     ConnectFrame FrameContent 
   | ConnectedFrame FrameContent
+  | ErrorFrame FrameContent
   deriving (Show, Eq)      
 
 data FrameContent =
@@ -199,11 +201,15 @@ combineFrame (Left errorMessage) _ _ = Left errorMessage
 combineFrame _ (Left errorMessage) _ = Left errorMessage
 combineFrame _ _ (Left errorMessage) = Left errorMessage
 
-combineFrame (Right "CONNECTED") (Right headers) (Right body) =
-  Right (ConnectedFrame (FrameContent headers body)) 
-
-combineFrame (Right _) (Right _) (Right _) =
-  (Left "not yet implemented")
+combineFrame (Right command) (Right headers) (Right body) =
+ let content = FrameContent headers body
+ in 
+    case command of
+      "CONNECTED" -> Right $ConnectedFrame content
+      "ERROR"     -> Right $ErrorFrame content
+      _           -> Left "not yet implemented" 
+    
+    
 
 ----------------------------------------------------------------------------
 
@@ -293,7 +299,7 @@ decodeFrameBody bodyString =
 
 
 -- 
--- Connect to the server
+-- Basic Communication
 ----------------------------------------------------------------------------
 
 -- stConnectToServer
@@ -328,8 +334,8 @@ stompConnectToServer hostname port =
       
                
 -- send a message
-stompSendMessage :: StompHandle -> StompFrame -> IO ()        
-stompSendMessage  stompHandle stompFrame =
+stompSendFrame :: StompHandle -> StompFrame -> IO ()        
+stompSendFrame  stompHandle stompFrame =
         do hPutStrLn networkHandle encodedMessage
         
            -- Make sure that we send data immediately
@@ -342,8 +348,8 @@ stompSendMessage  stompHandle stompFrame =
 -- 
 -- receives a message and decode it
 --            
-stompReceiveMessage :: StompHandle -> IO (Either ErrorMessage StompFrame)
-stompReceiveMessage stompHandle =
+stompReceiveFrame :: StompHandle -> IO (Either ErrorMessage StompFrame)
+stompReceiveFrame stompHandle =
         do 
            messageData <- readUntilNull networkHandle
            return $decodeFrame messageData
@@ -376,16 +382,33 @@ readUntilNull handle =
       else do remainder <- readUntilNull handle
               return (char : remainder)
     
+   
+   
+-- 
+-- STOMP interaction protocol
+----------------------------------------------------------------------------
            
            
 -- connect to Stomp
-stompConnectToMessaging :: StompHandle -> String -> String -> String -> IO ()
+stompConnectToMessaging :: StompHandle -> String -> String -> String -> IO (Maybe ErrorMessage)
 stompConnectToMessaging handle host login passcode =
-        let 
-                  connectMessage = createInitialConnectWithLogin host login passcode
-                in
-                  stompSendMessage handle connectMessage 
+  do 
+    stompSendFrame handle connectMessage
+    answer <- stompReceiveFrame handle
+    case answer of
+      Left errorMessage -> 
+        return (Just errorMessage)
+      Right (ConnectedFrame _) -> 
+        return Nothing
+      Right (ErrorFrame content) ->
+        return (Just (getBody content))
+      _ ->
+        (return (Just "Unknown frame received after sending the CONNECTED frame."))   
+  where 
+    connectMessage = createInitialConnectWithLogin host login passcode
+   
            
+---------------------------------------------------------------------------------------           
            
 -- alle Tests
 tests :: Test
