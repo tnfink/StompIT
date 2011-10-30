@@ -2,12 +2,13 @@
 -- * localhost wird bei IP-6 Unterstuetzung nicht aufgeloest, 
 --   für Details mit Loesung s. http://www.mail-archive.com/haskell-cafe@haskell.org/msg76549.html
 -- * "Quoting" von Sonderzeichen fehlt noch (s. "Value encoding")
--- * Es koennen mehrere Header mit gleichem Namen empfangen werden. Nur der erste ist zu uebergeben.  
+-- * Es koennen mehrere Header mit gleichem Namen empfangen werden. Nur der erste ist zu uebergeben. 
+-- * Fehlermeldung ist in dem header "message" 
 
 -- Aktueller Testlauf
 --   handle <- stompConnectToServer "127.0.0.1" "61613"
 --   stompConnectToMessaging handle "localhost" "guest" "guest"
---   stompReceiveFrame handle
+--   stompSendTextMessage handle "/queue/pingQueue" "Hola mundo!"
 
 
 module Stomp where
@@ -17,7 +18,7 @@ import Network.Socket
 -- import Network.BSD
 import Data.Either
 import Data.List
-import Data.Maybe
+-- import Data.Maybe
 import System.IO
 import Test.HUnit
 
@@ -50,6 +51,7 @@ data StompFrame =
     ConnectFrame FrameContent 
   | ConnectedFrame FrameContent
   | ErrorFrame FrameContent
+  | SendFrame FrameContent
   deriving (Show, Eq)      
 
 data FrameContent =
@@ -83,6 +85,12 @@ createInitialConnectWithLogin host login passcode =
                                   body
                    )     
 
+createSendMessageFrame :: String -> String -> StompFrame
+createSendMessageFrame destination message =
+  SendFrame ( FrameContent [("destination", destination), ("content-type","text/plain"), ("content-length", show $length message)]
+                           message
+            )
+
 --
 -- Encoding
 -------------------------------------------------------------------------------
@@ -105,11 +113,18 @@ testEncodeConnect = TestCase
   
 encodeFrame :: StompFrame -> String
 
+
 encodeFrame (ConnectFrame frameContent) =
   "CONNECT\n" ++ (encodeFrameContent frameContent)
   
 encodeFrame (ConnectedFrame frameContent) =
   "CONNECTED\n" ++ (encodeFrameContent frameContent)
+
+encodeFrame (SendFrame frameContent) =
+  "SEND\n" ++ (encodeFrameContent frameContent)
+
+encodeFrame (ErrorFrame frameContent) =
+  "ERROR\n" ++ (encodeFrameContent frameContent)
 
 
 --
@@ -390,6 +405,8 @@ readUntilNull handle =
            
            
 -- connect to Stomp
+----------------------------------------------------------------------------
+
 stompConnectToMessaging :: StompHandle -> String -> String -> String -> IO (Maybe ErrorMessage)
 stompConnectToMessaging handle host login passcode =
   do 
@@ -407,6 +424,20 @@ stompConnectToMessaging handle host login passcode =
   where 
     connectMessage = createInitialConnectWithLogin host login passcode
    
+     
+-- send text message
+----------------------------------------------------------------------------
+     
+stompSendTextMessage :: StompHandle -> String -> String -> IO (Maybe ErrorMessage)
+stompSendTextMessage handle destination message =
+  do
+    stompSendFrame handle sendFrame
+    return Nothing
+    -- what now, only in case of an error a message is sent 
+    -- better to use a state chart for it;
+  where
+    sendFrame = createSendMessageFrame destination message
+     
            
 ---------------------------------------------------------------------------------------           
            
