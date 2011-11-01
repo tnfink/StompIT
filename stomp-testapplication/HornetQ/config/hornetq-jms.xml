@@ -11,9 +11,15 @@
       </entries>
    </connection-factory>
 
-   <!--the queue used by the example-->
-   <queue name="exampleQueue">
-      <entry name="/queue/exampleQueue"/>
+   <!--the queue for ping requests -->
+   <queue name="pingQueue">
+      <entry name="/queue/pingQueue"/>
    </queue>
+
+   <!--the queue for pong responses -->
+   <queue name="pongQueue">
+      <entry name="/queue/pongQueue"/>
+   </queue>
+
 
 </configuration>

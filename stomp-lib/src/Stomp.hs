@@ -435,6 +435,7 @@ stompSendTextMessage handle destination message =
     return Nothing
     -- what now, only in case of an error a message is sent 
     -- better to use a state chart for it;
+    -- no! => server is sending a receipt
   where
     sendFrame = createSendMessageFrame destination message
      
